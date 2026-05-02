@@ -1,10 +1,19 @@
 import { readFileSync } from "fs";
 
-const svg = readFileSync(process.argv[2], "utf-8");
-const funcName = process.argv[3] || "createImage";
+const svgPath = process.argv[2];
+const funcName = process.argv[3] ?? "createImage";
 
-const viewBox = svg.match(/viewBox="([^"]+)"/)?.[1].split(/\s+/).map(Number) || [0, 0, 36, 36];
-const w = viewBox[2], h = viewBox[3];
+if (!svgPath) {
+  console.error("Usage: bun src/main.ts <svg-file> [function-name]");
+  process.exit(1);
+}
+
+const svg = readFileSync(svgPath, "utf-8");
+
+const viewBoxMatch = svg.match(/viewBox="([^"]+)"/);
+const viewBoxStr = viewBoxMatch?.[1];
+const viewBox = viewBoxStr ? viewBoxStr.split(/\s+/).map(Number) : [0, 0, 36, 36];
+const w = viewBox[2] ?? 36, h = viewBox[3] ?? 36;
 
 const paths = [...svg.matchAll(/d="([^"]+)"/g)].map(m => m[1]);
 
@@ -34,58 +43,65 @@ let swift = `func ${funcName}(size: NSSize = NSSize(width: ${w}, height: ${h})) 
 `;
 
 for (const d of paths) {
-  const tokens = d.match(/[MmLlHhVvCcSsQqTtAaZz]|[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/g) || [];
+  if (!d) continue;
+  const tokens = d.match(/[MmLlHhVvCcSsQqTtAaZz]|[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/g) ?? [];
   let i = 0, cx = 0, cy = 0;
   let startX = 0, startY = 0;
 
+  const next = (): number => {
+    const val = tokens[i++];
+    return val !== undefined ? +val : 0;
+  };
+
   while (i < tokens.length) {
     const t = tokens[i++];
+    if (!t) continue;
     switch (t) {
       case 'M':
-        cx = +tokens[i++]; cy = +tokens[i++];
+        cx = next(); cy = next();
         startX = cx; startY = cy;
         swift += `    path.move(to: CGPoint(x: ${cx} * scaleX, y: (${h} - ${cy}) * scaleY))\n`;
         break;
       case 'm':
-        cx += +tokens[i++]; cy += +tokens[i++];
+        cx += next(); cy += next();
         startX = cx; startY = cy;
         swift += `    path.move(to: CGPoint(x: ${cx} * scaleX, y: (${h} - ${cy}) * scaleY))\n`;
         break;
       case 'L':
-        cx = +tokens[i++]; cy = +tokens[i++];
+        cx = next(); cy = next();
         swift += `    path.addLine(to: CGPoint(x: ${cx} * scaleX, y: (${h} - ${cy}) * scaleY))\n`;
         break;
       case 'l':
-        cx += +tokens[i++]; cy += +tokens[i++];
+        cx += next(); cy += next();
         swift += `    path.addLine(to: CGPoint(x: ${cx} * scaleX, y: (${h} - ${cy}) * scaleY))\n`;
         break;
       case 'H':
-        cx = +tokens[i++];
+        cx = next();
         swift += `    path.addLine(to: CGPoint(x: ${cx} * scaleX, y: (${h} - ${cy}) * scaleY))\n`;
         break;
       case 'h':
-        cx += +tokens[i++];
+        cx += next();
         swift += `    path.addLine(to: CGPoint(x: ${cx} * scaleX, y: (${h} - ${cy}) * scaleY))\n`;
         break;
       case 'V':
-        cy = +tokens[i++];
+        cy = next();
         swift += `    path.addLine(to: CGPoint(x: ${cx} * scaleX, y: (${h} - ${cy}) * scaleY))\n`;
         break;
       case 'v':
-        cy += +tokens[i++];
+        cy += next();
         swift += `    path.addLine(to: CGPoint(x: ${cx} * scaleX, y: (${h} - ${cy}) * scaleY))\n`;
         break;
       case 'C': {
-        const c1x = +tokens[i++], c1y = +tokens[i++];
-        const c2x = +tokens[i++], c2y = +tokens[i++];
-        cx = +tokens[i++]; cy = +tokens[i++];
+        const c1x = next(), c1y = next();
+        const c2x = next(), c2y = next();
+        cx = next(); cy = next();
         swift += `    path.addCurve(to: CGPoint(x: ${cx} * scaleX, y: (${h} - ${cy}) * scaleY), control1: CGPoint(x: ${c1x} * scaleX, y: (${h} - ${c1y}) * scaleY), control2: CGPoint(x: ${c2x} * scaleX, y: (${h} - ${c2y}) * scaleY))\n`;
         break;
       }
       case 'c': {
-        const c1x = cx + +tokens[i++], c1y = cy + +tokens[i++];
-        const c2x = cx + +tokens[i++], c2y = cy + +tokens[i++];
-        cx += +tokens[i++]; cy += +tokens[i++];
+        const c1x = cx + next(), c1y = cy + next();
+        const c2x = cx + next(), c2y = cy + next();
+        cx += next(); cy += next();
         swift += `    path.addCurve(to: CGPoint(x: ${cx} * scaleX, y: (${h} - ${cy}) * scaleY), control1: CGPoint(x: ${c1x} * scaleX, y: (${h} - ${c1y}) * scaleY), control2: CGPoint(x: ${c2x} * scaleX, y: (${h} - ${c2y}) * scaleY))\n`;
         break;
       }
