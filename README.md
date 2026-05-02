@@ -4,7 +4,10 @@ A basic CLI that takes a svg as an input, and outputs the a swift UI NSImage rep
 
 ```sh
 $ bun ./src/main.ts ./path/to/image.svg
+```
 
+#### Outputs
+```swift
 func createIconImage(size: NSSize = NSSize(width: 1024, height: 1024)) -> NSImage {
   let image = NSImage(size: size)
   // ...
